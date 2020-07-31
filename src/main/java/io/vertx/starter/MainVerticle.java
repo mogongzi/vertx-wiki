@@ -2,6 +2,7 @@ package io.vertx.starter;
 
 import com.github.rjeschke.txtmark.Processor;
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.core.http.HttpServer;
@@ -39,8 +40,24 @@ public class MainVerticle extends AbstractVerticle {
 
   @Override
   public void start(Promise<Void> promise) {
-    Future<Void> steps = prepareDatabase().compose( v -> startHttpServer());
-    steps.setHandler(ar -> {
+//    Future<Void> steps = prepareDatabase().compose( v -> startHttpServer());
+//    steps.setHandler(ar -> {
+//      if (ar.succeeded()) {
+//        promise.complete();
+//      } else {
+//        promise.fail(ar.cause());
+//      }
+//    });
+
+    Promise<String> dbVerticleDeployment  = Promise.promise();
+    vertx.deployVerticle(new WikiDatabaseVerticle(), dbVerticleDeployment);
+
+    dbVerticleDeployment.future().compose(id -> {
+      Promise<String> httpVerticleDeployment = Promise.promise();
+      vertx.deployVerticle("io.vertx.starter.HttpServerVerticle", new DeploymentOptions().setInstances(2), httpVerticleDeployment);
+
+      return httpVerticleDeployment.future();
+    }).setHandler(ar -> {
       if (ar.succeeded()) {
         promise.complete();
       } else {
@@ -220,8 +237,7 @@ public class MainVerticle extends AbstractVerticle {
         connection.query(SQL_ALL_PAGES, res -> {
           connection.close();
           if (res.succeeded()) {
-            List<String> pages = res.result()
-                    .getResults()
+            List<String> pages = res.result().getResults()
                     .stream()
                     .map(json -> json.getString(0))
                     .sorted()
