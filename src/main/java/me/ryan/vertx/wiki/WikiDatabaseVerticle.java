@@ -1,4 +1,4 @@
-package io.vertx.starter;
+package me.ryan.vertx.wiki;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
@@ -169,7 +169,7 @@ public class WikiDatabaseVerticle extends AbstractVerticle {
                        .map(json -> json.getString(0))
                        .sorted()
                        .collect(Collectors.toList());
-               
+
                message.reply(new JsonObject().put("pages", new JsonArray(pages)));
            } else {
                reportQueryError(message, res.cause());

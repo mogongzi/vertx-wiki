@@ -1,4 +1,4 @@
-package io.vertx.starter;
+package me.ryan.vertx.wiki;
 
 import io.vertx.core.Vertx;
 import io.vertx.ext.unit.Async;

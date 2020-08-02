@@ -1,4 +1,4 @@
-package io.vertx.starter;
+package me.ryan.vertx.wiki;
 
 import com.github.rjeschke.txtmark.Processor;
 import io.vertx.core.AbstractVerticle;
@@ -54,7 +54,7 @@ public class MainVerticle extends AbstractVerticle {
 
     dbVerticleDeployment.future().compose(id -> {
       Promise<String> httpVerticleDeployment = Promise.promise();
-      vertx.deployVerticle("io.vertx.starter.HttpServerVerticle", new DeploymentOptions().setInstances(2), httpVerticleDeployment);
+      vertx.deployVerticle("me.ryan.vertx.wiki.HttpServerVerticle", new DeploymentOptions().setInstances(2), httpVerticleDeployment);
 
       return httpVerticleDeployment.future();
     }).setHandler(ar -> {

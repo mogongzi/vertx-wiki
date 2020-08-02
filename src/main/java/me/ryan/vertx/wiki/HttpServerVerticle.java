@@ -1,4 +1,4 @@
-package io.vertx.starter;
+package me.ryan.vertx.wiki;
 
 import com.github.rjeschke.txtmark.Processor;
 import io.vertx.core.AbstractVerticle;
@@ -9,6 +9,8 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
+import io.vertx.ext.web.handler.FaviconHandler;
+import io.vertx.ext.web.handler.StaticHandler;
 import io.vertx.ext.web.templ.freemarker.FreeMarkerTemplateEngine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +42,9 @@ public class HttpServerVerticle extends AbstractVerticle {
         router.post("/save").handler(this::pageUpdateHandler);
         router.post("/create").handler(this::pageCreateHandler);
         router.post("/delete").handler(this::pageDeletionHandler);
+
+        router.route().handler(StaticHandler.create());
+        router.route().handler(FaviconHandler.create());
 
         templateEngine = FreeMarkerTemplateEngine.create(vertx);
 
