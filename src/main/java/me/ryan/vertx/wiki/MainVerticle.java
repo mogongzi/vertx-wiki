@@ -14,6 +14,7 @@ import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.templ.freemarker.FreeMarkerTemplateEngine;
+import me.ryan.vertx.wiki.database.WikiDatabaseVerticle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +55,7 @@ public class MainVerticle extends AbstractVerticle {
 
     dbVerticleDeployment.future().compose(id -> {
       Promise<String> httpVerticleDeployment = Promise.promise();
-      vertx.deployVerticle("me.ryan.vertx.wiki.HttpServerVerticle", new DeploymentOptions().setInstances(2), httpVerticleDeployment);
+      vertx.deployVerticle("me.ryan.vertx.wiki.http.HttpServerVerticle", new DeploymentOptions().setInstances(2), httpVerticleDeployment);
 
       return httpVerticleDeployment.future();
     }).setHandler(ar -> {
