@@ -63,7 +63,7 @@ public class HttpServerVerticle extends AbstractVerticle {
 
         Router apiRouter = Router.router(vertx);
         apiRouter.get("/pages").handler(this::apiRoot);
-        apiRouter.get("/page/:id").handler(this::apiGetPage);
+        apiRouter.get("/pages/:id").handler(this::apiGetPage);
         apiRouter.post().handler(BodyHandler.create());
         apiRouter.post("/pages").handler(this::apiCreatePages);
         apiRouter.put().handler(BodyHandler.create());
@@ -195,11 +195,6 @@ public class HttpServerVerticle extends AbstractVerticle {
                                 .put("id", obj.getInteger("ID"))
                                 .put("name", obj.getString("NAME")))
                         .collect(Collectors.toList());
-
-                pages.forEach(e -> {
-                    LOGGER.info(e.encodePrettily());
-                });
-
                 response.put("success", true)
                         .put("pages", pages);
                 context.response().setStatusCode(200);
