@@ -97,9 +97,9 @@ public class WikiDatabaseServiceImpl implements WikiDatabaseService{
                     JsonObject result = res.result().getRows().get(0);
                     resultHandler.handle(Future.succeededFuture(new JsonObject()
                             .put("found", true)
-                            .put("id", result.getInteger("id"))
-                            .put("name", result.getString("name"))
-                            .put("content", result.getString("content"))));
+                            .put("id", result.getInteger("ID"))
+                            .put("name", result.getString("NAME"))
+                            .put("content", result.getString("CONTENT"))));
                 } else {
                     resultHandler.handle(Future.succeededFuture(new JsonObject()
                             .put("found", false)));
