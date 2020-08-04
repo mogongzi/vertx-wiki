@@ -22,7 +22,7 @@ public class WikiDatabaseServiceTest {
         vertx = Vertx.vertx();
 
         JsonObject conf = new JsonObject()
-                .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_URL, "jdbc:hsqldb:men:testdb;shutdown=true")
+                .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_URL, "jdbc:hsqldb:mem:testdb;shutdown=true")
                 .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_MAX_POOL_SIZE, 4);
 
         vertx.deployVerticle(new WikiDatabaseVerticle(), new DeploymentOptions().setConfig(conf),
@@ -65,6 +65,6 @@ public class WikiDatabaseServiceTest {
             }));
         }));
 
-        async.awaitSuccess(5000);
+        async.awaitSuccess(5000L);
     }
 }
