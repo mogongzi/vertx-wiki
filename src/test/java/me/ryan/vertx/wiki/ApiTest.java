@@ -21,6 +21,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import static me.ryan.vertx.wiki.DatabaseConstants.*;
+
 @RunWith(VertxUnitRunner.class)
 public class ApiTest {
     private Vertx vertx;
@@ -31,8 +33,8 @@ public class ApiTest {
         vertx = Vertx.vertx();
 
         JsonObject dbConf = new JsonObject()
-                .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_URL, "jdbc:hsqldb:mem:testdb;shutdown=true")
-                .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_MAX_POOL_SIZE, 4);
+                .put(CONFIG_WIKIDB_JDBC_URL, "jdbc:hsqldb:mem:testdb;shutdown=true")
+                .put(CONFIG_WIKIDB_JDBC_MAX_POOL_SIZE, 4);
 
         vertx.deployVerticle(new WikiDatabaseVerticle(), new DeploymentOptions().setConfig(dbConf),
                 context.asyncAssertSuccess());
@@ -40,7 +42,7 @@ public class ApiTest {
         vertx.deployVerticle(new HttpServerVerticle(), context.asyncAssertSuccess());
 
         webClient = WebClient.create(vertx, new WebClientOptions().setDefaultHost("localhost").setDefaultPort(8080)
-                .setSsl(true).setTrustOptions(new JksOptions().setPath("server-keystore.jks").setPassword("secret")));
+                .setSsl(true).setTrustOptions(new JksOptions().setPath("keystore.jks").setPassword("password")));
     }
 
     @After
