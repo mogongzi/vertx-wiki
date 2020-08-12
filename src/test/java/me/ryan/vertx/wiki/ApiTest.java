@@ -15,6 +15,7 @@ import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.ext.web.codec.BodyCodec;
 import me.ryan.vertx.wiki.database.WikiDatabaseVerticle;
+import me.ryan.vertx.wiki.http.AuthInitializerVerticle;
 import me.ryan.vertx.wiki.http.HttpServerVerticle;
 import org.junit.After;
 import org.junit.Before;
@@ -35,6 +36,9 @@ public class ApiTest {
         JsonObject dbConf = new JsonObject()
                 .put(CONFIG_WIKIDB_JDBC_URL, "jdbc:hsqldb:mem:testdb;shutdown=true")
                 .put(CONFIG_WIKIDB_JDBC_MAX_POOL_SIZE, 4);
+
+        vertx.deployVerticle(new AuthInitializerVerticle(), new DeploymentOptions().setConfig(dbConf),
+                context.asyncAssertSuccess());
 
         vertx.deployVerticle(new WikiDatabaseVerticle(), new DeploymentOptions().setConfig(dbConf),
                 context.asyncAssertSuccess());
