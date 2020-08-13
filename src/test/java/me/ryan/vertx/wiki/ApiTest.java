@@ -28,6 +28,7 @@ import static me.ryan.vertx.wiki.DatabaseConstants.*;
 public class ApiTest {
     private Vertx vertx;
     private WebClient webClient;
+    private String jwtTokenHeaderValue;
 
     @Before
     public void prepare(TestContext context) {
@@ -58,21 +59,35 @@ public class ApiTest {
     public void play_with_api(TestContext context) {
         Async async = context.async();
 
+        Promise<HttpResponse<String>> tokenPromise = Promise.promise();
+        webClient.get("/api/token")
+                .putHeader("login", "foo")
+                .putHeader("password", "bar")
+                .as(BodyCodec.string())
+                .send(tokenPromise);
+        Future<HttpResponse<String>> tokenFuture = tokenPromise.future();
+
         JsonObject page = new JsonObject()
                 .put("name", "Sample")
                 .put("markdown", "# A page");
 
-        Promise<HttpResponse<JsonObject>> postPagePromise = Promise.promise();
-        webClient.post("/api/pages")
-                .as(BodyCodec.jsonObject())
-                .sendJsonObject(page, postPagePromise);
+        Future<HttpResponse<JsonObject>> postPagePromise = tokenFuture.compose(tokenResponse -> {
+            Promise<HttpResponse<JsonObject>> promise = Promise.promise();
+            jwtTokenHeaderValue = "Bearer " + tokenResponse.body();
+            webClient.post("/api/pages")
+                    .putHeader("Authorization", jwtTokenHeaderValue)
+                    .as(BodyCodec.jsonObject())
+                    .sendJsonObject(page, promise);
+            return promise.future();
+        });
 
-        Future<HttpResponse<JsonObject>> getPageFuture = postPagePromise.future().compose(resp -> {
-           Promise<HttpResponse<JsonObject>> promise = Promise.promise();
-           webClient.get("/api/pages")
-                   .as(BodyCodec.jsonObject())
-                   .send(promise);
-           return promise.future();
+        Future<HttpResponse<JsonObject>> getPageFuture = postPagePromise.compose(resp -> {
+            Promise<HttpResponse<JsonObject>> promise = Promise.promise();
+            webClient.get("/api/pages")
+                    .putHeader("Authorization", jwtTokenHeaderValue)
+                    .as(BodyCodec.jsonObject())
+                    .send(promise);
+            return promise.future();
         });
 
         Future<HttpResponse<JsonObject>> updatePageFuture = getPageFuture.compose(resp -> {
@@ -84,27 +99,29 @@ public class ApiTest {
                     .put("id", 0)
                     .put("markdown", "Oh Yeah!");
             webClient.put("/api/pages/0")
+                    .putHeader("Authorization", jwtTokenHeaderValue)
                     .as(BodyCodec.jsonObject())
                     .sendJsonObject(data, promise);
             return promise.future();
         });
 
         Future<HttpResponse<JsonObject>> deletePageFuture = updatePageFuture.compose(resp -> {
-           context.assertTrue(resp.body().getBoolean("success"));
-           Promise<HttpResponse<JsonObject>> promise = Promise.promise();
-           webClient.delete("/api/pages/0")
-                   .as(BodyCodec.jsonObject())
-                   .send(promise);
-           return promise.future();
+            context.assertTrue(resp.body().getBoolean("success"));
+            Promise<HttpResponse<JsonObject>> promise = Promise.promise();
+            webClient.delete("/api/pages/0")
+                    .putHeader("Authorization", jwtTokenHeaderValue)
+                    .as(BodyCodec.jsonObject())
+                    .send(promise);
+            return promise.future();
         });
 
         deletePageFuture.setHandler(ar -> {
-           if (ar.succeeded()) {
-               context.assertTrue(ar.result().body().getBoolean("success"));
-               async.complete();
-           } else {
-               context.fail(ar.cause());
-           }
+            if (ar.succeeded()) {
+                context.assertTrue(ar.result().body().getBoolean("success"));
+                async.complete();
+            } else {
+                context.fail(ar.cause());
+            }
         });
 
         async.awaitSuccess(5000L);

@@ -10,7 +10,12 @@ import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.net.JksOptions;
+import io.vertx.ext.auth.JWTOptions;
+import io.vertx.ext.auth.PubSecKeyOptions;
+import io.vertx.ext.auth.User;
 import io.vertx.ext.auth.jdbc.JDBCAuth;
+import io.vertx.ext.auth.jwt.JWTAuth;
+import io.vertx.ext.auth.jwt.JWTAuthOptions;
 import io.vertx.ext.jdbc.JDBCClient;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
@@ -22,6 +27,7 @@ import io.vertx.ext.web.handler.*;
 import io.vertx.ext.web.sstore.LocalSessionStore;
 import io.vertx.ext.web.templ.freemarker.FreeMarkerTemplateEngine;
 import me.ryan.vertx.wiki.database.WikiDatabaseService;
+import org.apache.commons.lang3.BooleanUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,9 +64,9 @@ public class HttpServerVerticle extends AbstractVerticle {
                 .setKeyStoreOptions(new JksOptions().setPath("keystore.jks").setPassword("password")));
 
         JDBCClient dbClient = JDBCClient.createShared(vertx, new JsonObject()
-        .put("url", config().getString(CONFIG_WIKIDB_JDBC_URL, DEFAULT_WIKIDB_JDBC_URL))
-        .put("driver_class", config().getString(CONFIG_WIKIDB_JDBC_DRIVER_CLASS, DEFAULT_WIKIDB_JDBC_DRIVER_CLASS))
-        .put("max_pool_size", config().getInteger(CONFIG_WIKIDB_JDBC_MAX_POOL_SIZE, DEFAULT_JDBC_MAX_POOL_SIZE)));
+                .put("url", config().getString(CONFIG_WIKIDB_JDBC_URL, DEFAULT_WIKIDB_JDBC_URL))
+                .put("driver_class", config().getString(CONFIG_WIKIDB_JDBC_DRIVER_CLASS, DEFAULT_WIKIDB_JDBC_DRIVER_CLASS))
+                .put("max_pool_size", config().getInteger(CONFIG_WIKIDB_JDBC_MAX_POOL_SIZE, DEFAULT_JDBC_MAX_POOL_SIZE)));
 
         JDBCAuth auth = JDBCAuth.create(vertx, dbClient);
 
@@ -86,11 +92,46 @@ public class HttpServerVerticle extends AbstractVerticle {
         router.get("/login").handler(this::LoginHandler);
         router.post("/login-auth").handler(FormLoginHandler.create(auth));
         router.get("/logout").handler(context -> {
-           context.clearUser();
-           context.response().setStatusCode(302).putHeader("Location", "/").end();
+            context.clearUser();
+            context.response().setStatusCode(302).putHeader("Location", "/").end();
         });
 
         Router apiRouter = Router.router(vertx);
+
+        JWTAuth jwtAuth = JWTAuth.create(vertx, new JWTAuthOptions()
+                .addPubSecKey(new PubSecKeyOptions().setAlgorithm("HS256").setPublicKey("secret").setSymmetric(true)));
+
+        apiRouter.route().handler(JWTAuthHandler.create(jwtAuth, "/api/token"));
+        apiRouter.get("/token").handler(context -> {
+            JsonObject creds = new JsonObject()
+                    .put("username", context.request().getHeader("login"))
+                    .put("password", context.request().getHeader("password"));
+            auth.authenticate(creds, authResult -> {
+                if (authResult.succeeded()) {
+                    User user = authResult.result();
+                    user.isAuthorized("create", canCreate -> {
+                        user.isAuthorized("delete", canDelete -> {
+                            user.isAuthorized("update", canUpdate -> {
+                                String token = jwtAuth.generateToken(
+                                        new JsonObject()
+                                                .put("username", context.request().getHeader("login"))
+                                                .put("canCreate", canCreate.succeeded() && canCreate.result())
+                                                .put("canDelete", canDelete.succeeded() && canDelete.result())
+                                                .put("canUpdate", canUpdate.succeeded() && canUpdate.result()),
+                                        new JWTOptions()
+                                                .setSubject("Wiki API")
+                                                .setIssuer("Vert.x"));
+
+                                context.response().putHeader("Content-Type", "text/plain").end(token);
+                            });
+                        });
+                    });
+                } else {
+                    context.fail(401);
+                }
+            });
+        });
+
         apiRouter.get("/pages").handler(this::apiRoot);
         apiRouter.get("/pages/:id").handler(this::apiGetPage);
         apiRouter.post().handler(BodyHandler.create());
@@ -131,21 +172,29 @@ public class HttpServerVerticle extends AbstractVerticle {
     }
 
     private void apiDeletePage(RoutingContext context) {
-        int id = Integer.parseInt(context.request().getParam("id"));
-        dbService.deletePage(id, reply -> {
-            handleSimpleDbReply(context, reply);
-        });
+        if (BooleanUtils.isTrue(context.user().principal().getBoolean("canDelete", false))) {
+            int id = Integer.parseInt(context.request().getParam("id"));
+            dbService.deletePage(id, reply -> {
+                handleSimpleDbReply(context, reply);
+            });
+        } else {
+            context.fail(401);
+        }
     }
 
     private void apiUpdatePage(RoutingContext context) {
-        int id = Integer.parseInt(context.request().getParam("id"));
-        JsonObject page = context.getBodyAsJson();
-        if (!validateJsonPageDocument(context, page, "markdown")) {
-            return;
+        if (BooleanUtils.isTrue(context.user().principal().getBoolean("canUpdate", false))) {
+            int id = Integer.parseInt(context.request().getParam("id"));
+            JsonObject page = context.getBodyAsJson();
+            if (!validateJsonPageDocument(context, page, "markdown")) {
+                return;
+            }
+            dbService.savePage(id, page.getString("markdown"), reply -> {
+                handleSimpleDbReply(context, reply);
+            });
+        } else {
+            context.fail(401);
         }
-        dbService.savePage(id, page.getString("markdown"), reply -> {
-            handleSimpleDbReply(context, reply);
-        });
     }
 
     private void handleSimpleDbReply(RoutingContext context, AsyncResult<Void> reply) {
@@ -163,24 +212,28 @@ public class HttpServerVerticle extends AbstractVerticle {
     }
 
     private void apiCreatePages(RoutingContext context) {
-        JsonObject page = context.getBodyAsJson();
-        if (!validateJsonPageDocument(context, page, "name", "markdown")) {
-            return;
-        }
-
-        dbService.createPage(page.getString("name"), page.getString("markdown"), reply -> {
-            if (reply.succeeded()) {
-                context.response().setStatusCode(201);
-                context.response().putHeader("Content-Type", "application/json");
-                context.response().end(new JsonObject().put("success", true).encode());
-            } else {
-                context.response().setStatusCode(500);
-                context.response().putHeader("Content-Type", "application/json");
-                context.response().end(new JsonObject()
-                        .put("success", false)
-                        .put("error", reply.cause().getMessage()).encode());
+        if (BooleanUtils.isTrue(context.user().principal().getBoolean("canCreate", false))) {
+            JsonObject page = context.getBodyAsJson();
+            if (!validateJsonPageDocument(context, page, "name", "markdown")) {
+                return;
             }
-        });
+
+            dbService.createPage(page.getString("name"), page.getString("markdown"), reply -> {
+                if (reply.succeeded()) {
+                    context.response().setStatusCode(201);
+                    context.response().putHeader("Content-Type", "application/json");
+                    context.response().end(new JsonObject().put("success", true).encode());
+                } else {
+                    context.response().setStatusCode(500);
+                    context.response().putHeader("Content-Type", "application/json");
+                    context.response().end(new JsonObject()
+                            .put("success", false)
+                            .put("error", reply.cause().getMessage()).encode());
+                }
+            });
+        } else {
+            context.fail(401);
+        }
     }
 
     private boolean validateJsonPageDocument(RoutingContext context, JsonObject page, String... expectedKeys) {
@@ -346,6 +399,8 @@ public class HttpServerVerticle extends AbstractVerticle {
                 if (reply.succeeded()) {
                     context.put("title", "Wiki home");
                     context.put("pages", reply.result().getList());
+                    context.put("canCreatePage", canCreatePage);
+                    context.put("username", context.user().principal().getString("username"));
                     templateEngine.render(context.data(), "templates/index.ftl", ar -> {
                         if (ar.succeeded()) {
                             context.response().putHeader("Content-Type", "text/html");
