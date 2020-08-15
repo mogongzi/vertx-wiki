@@ -10,7 +10,6 @@ import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.jdbc.JDBCClient;
-
 import java.util.HashMap;
 import java.util.List;
 
@@ -45,7 +44,7 @@ public interface WikiDatabaseService {
     }
 
     @GenIgnore
-    static WikiDatabaseService createProxy(Vertx vertx, String address) {
-        return new WikiDatabaseServiceVertxEBProxy(vertx, address);
+    static me.ryan.vertx.wiki.database.reactivex.WikiDatabaseService createProxy(Vertx vertx, String address) {
+        return new me.ryan.vertx.wiki.database.reactivex.WikiDatabaseService(new WikiDatabaseServiceVertxEBProxy(vertx, address));
     }
 }

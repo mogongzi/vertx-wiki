@@ -11,6 +11,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import me.ryan.vertx.wiki.database.reactivex.WikiDatabaseService;
+
 import static me.ryan.vertx.wiki.DatabaseConstants.*;
 
 @RunWith(VertxUnitRunner.class)
@@ -29,7 +31,7 @@ public class WikiDatabaseServiceTest {
 
         vertx.deployVerticle(new WikiDatabaseVerticle(), new DeploymentOptions().setConfig(conf),
                 context.asyncAssertSuccess(id -> {
-                    service = WikiDatabaseService.createProxy(vertx, WikiDatabaseVerticle.CONFIG_WIKIDB_QUEUE);
+                    service = me.ryan.vertx.wiki.database.WikiDatabaseService.createProxy(vertx, WikiDatabaseVerticle.CONFIG_WIKIDB_QUEUE);
                 }));
     }
 
