@@ -3,8 +3,12 @@ package me.ryan.vertx.wiki.http;
 import com.github.rjeschke.txtmark.Processor;
 import io.reactivex.Flowable;
 import io.vertx.core.Promise;
+import io.vertx.core.json.Json;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.ext.bridge.BridgeOptions;
+import io.vertx.ext.bridge.PermittedOptions;
+import io.vertx.ext.web.handler.sockjs.SockJSBridgeOptions;
 import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.core.http.HttpServer;
 import io.vertx.reactivex.ext.web.Router;
@@ -13,9 +17,9 @@ import io.vertx.reactivex.ext.web.handler.BodyHandler;
 import io.vertx.reactivex.ext.web.handler.FaviconHandler;
 import io.vertx.reactivex.ext.web.handler.SessionHandler;
 import io.vertx.reactivex.ext.web.handler.StaticHandler;
+import io.vertx.reactivex.ext.web.handler.sockjs.SockJSHandler;
 import io.vertx.reactivex.ext.web.sstore.LocalSessionStore;
 import me.ryan.vertx.wiki.database.reactivex.WikiDatabaseService;
-import org.apache.commons.lang3.BooleanUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,14 +47,19 @@ public class HttpServerVerticle extends AbstractVerticle {
         router.route().handler(StaticHandler.create());
         router.route().handler(FaviconHandler.create());
 
-        router.get("/app/*").handler(StaticHandler.create().setCachingEnabled(false));
-        router.get("/").handler(context -> context.reroute("/app/index.html"));
-
-        router.post("/app/markdown").handler(context -> {
-            String html = Processor.process(context.getBodyAsString());
-            context.response().putHeader("Content-Type", "text/html").setStatusCode(200).end(html);
+        SockJSHandler sockJSHandler = SockJSHandler.create(vertx);
+        SockJSBridgeOptions bridgeOptions = new SockJSBridgeOptions()
+                .addInboundPermitted(new PermittedOptions().setAddress("app.markdown"))
+                .addOutboundPermitted(new PermittedOptions().setAddress("page.saved"));
+        sockJSHandler.bridge(bridgeOptions);
+        router.route("/eventbus/*").handler(sockJSHandler);
+        vertx.eventBus().<String>consumer("app.markdown", msg -> {
+            String html = Processor.process(msg.body());
+            msg.reply(html);
         });
 
+        router.get("/app/*").handler(StaticHandler.create().setCachingEnabled(false));
+        router.get("/").handler(context -> context.reroute("/app/index.html"));
         router.get("/api/pages").handler(this::apiRoot);
         router.get("/api/pages/:id").handler(this::apiGetPage);
         router.post().handler(BodyHandler.create());
@@ -114,6 +123,12 @@ public class HttpServerVerticle extends AbstractVerticle {
             return;
         }
         dbService.rxSavePage(id, page.getString("markdown"))
+                .doOnComplete(() -> {
+                    JsonObject event = new JsonObject()
+                            .put("id", id)
+                            .put("client", page.getString("client"));
+                    vertx.eventBus().publish("page.saved", event);
+                })
                 .subscribe(() -> apiResponse(context, 200, null, null), t -> apiFailure(context, t));
     }
 
