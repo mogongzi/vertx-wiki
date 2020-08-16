@@ -98,41 +98,29 @@ public class HttpServerVerticle extends AbstractVerticle {
     }
 
     private void apiCreatePages(RoutingContext context) {
-        if (BooleanUtils.isTrue(context.user().principal().getBoolean("canCreate", false))) {
-            JsonObject page = context.getBodyAsJson();
-            if (validateJsonPageDocument(context, page, "name", "markdown")) {
-                return;
-            }
-
-            dbService.rxCreatePage(page.getString("name"), page.getString("markdown"))
-                    .subscribe(() -> apiResponse(context, 201, null, null), t -> apiFailure(context, t));
-        } else {
-            context.fail(401);
+        JsonObject page = context.getBodyAsJson();
+        if (validateJsonPageDocument(context, page, "name", "markdown")) {
+            return;
         }
+
+        dbService.rxCreatePage(page.getString("name"), page.getString("markdown"))
+                .subscribe(() -> apiResponse(context, 201, null, null), t -> apiFailure(context, t));
     }
 
     private void apiUpdatePage(RoutingContext context) {
-        if (BooleanUtils.isTrue(context.user().principal().getBoolean("canUpdate", false))) {
-            int id = Integer.parseInt(context.request().getParam("id"));
-            JsonObject page = context.getBodyAsJson();
-            if (validateJsonPageDocument(context, page, "markdown")) {
-                return;
-            }
-            dbService.rxSavePage(id, page.getString("markdown"))
-                    .subscribe(() -> apiResponse(context, 200, null, null), t -> apiFailure(context, t));
-        } else {
-            context.fail(401);
+        int id = Integer.parseInt(context.request().getParam("id"));
+        JsonObject page = context.getBodyAsJson();
+        if (validateJsonPageDocument(context, page, "markdown")) {
+            return;
         }
+        dbService.rxSavePage(id, page.getString("markdown"))
+                .subscribe(() -> apiResponse(context, 200, null, null), t -> apiFailure(context, t));
     }
 
     private void apiDeletePage(RoutingContext context) {
-        if (BooleanUtils.isTrue(context.user().principal().getBoolean("canDelete", false))) {
-            int id = Integer.parseInt(context.request().getParam("id"));
-            dbService.rxDeletePage(id)
-                    .subscribe(() -> apiResponse(context, 200, null, null), t -> apiFailure(context, t));
-        } else {
-            context.fail(401);
-        }
+        int id = Integer.parseInt(context.request().getParam("id"));
+        dbService.rxDeletePage(id)
+                .subscribe(() -> apiResponse(context, 200, null, null), t -> apiFailure(context, t));
     }
 
     private void apiResponse(RoutingContext context, int statusCode, String jsonField, Object jsonData) {
