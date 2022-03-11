@@ -10,7 +10,7 @@
     <version>1.0-SNAPSHOT</version>
 
     <properties>
-        <vertx.version>3.9.2</vertx.version>
+        <vertx.version>3.9.12</vertx.version>
         <main.verticle>me.ryan.vertx.wiki.MainVerticle</main.verticle>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
