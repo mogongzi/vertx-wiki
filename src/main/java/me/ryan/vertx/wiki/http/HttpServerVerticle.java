@@ -43,7 +43,7 @@ public class HttpServerVerticle extends AbstractVerticle {
         router.route().handler(BodyHandler.create());
         router.route().handler(SessionHandler.create(LocalSessionStore.create(vertx)));
         router.route().handler(StaticHandler.create());
-        router.route().handler(FaviconHandler.create());
+        router.route().handler(FaviconHandler.create(vertx));
 
         SockJSHandler sockJSHandler = SockJSHandler.create(vertx);
         SockJSBridgeOptions bridgeOptions = new SockJSBridgeOptions()
